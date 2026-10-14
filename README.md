@@ -1,184 +1,156 @@
-# ⚡ IRIS — Intelligent Resolution Incident System
-### *Organizational Knowledge & Closed-Loop Incident Resolution Platform*
-**Course:** Database Systems &bull;
+# IRIS — Intelligent Resolution Incident System
+### *Enterprise Organizational Knowledge & Database-Augmented Incident Resolution System*
 
 ---
 
-## 📌 Problem Statement: The Incident Resolution Crisis
+## 📌 Overview
 
-Modern engineering organizations face two major roadblocks during production outages:
-1. **The "Tribal Knowledge" Trap:** Critical debugging knowledge is trapped in the heads of a few senior engineers or scattered across lost Slack messages, closed tickets, and unmaintained wikis. When a critical issue occurs and that engineer is unavailable, teams waste hours diagnosing the exact same failure from scratch.
-2. **The Disconnected AI & Ticketing Gap:** Traditional ticketing tools (e.g., Jira) are passive storage lockers that do not actively diagnose issues. Meanwhile, generic AI models (e.g., ChatGPT) have no awareness of your internal infrastructure, architecture, or past organizational incident history.
+**IRIS** is an AI-assisted organizational incident resolution platform built around a database-first philosophy.
 
----
+In modern engineering organizations, teams repeatedly encounter similar production outages, database locks, connection pool exhausts, and infrastructure anomalies. Conventional issue trackers (such as Jira or GitHub Issues) function merely as passive text logs without reasoning capabilities, while generic LLMs (such as stock ChatGPT) lack organizational history and internal infrastructure context.
 
-## 💡 What is IRIS?
-
-**IRIS (Intelligent Resolution Incident System)** is a **database-centric incident intelligence platform** that unifies relational historical data with automated root-cause diagnosis. 
-
-Instead of treating incident logs as dead text, IRIS places a **relational database at the center** of incident management:
-- **Instant Retrieval:** Runs high-speed SQL queries to fetch historical precedents and past validated solutions.
-- **Deep Diagnosis:** Synthesizes root causes, step-by-step resolution checklists, and confidence ratings.
-- **Closed-Loop Learning:** Ingests accepted fixes back into the relational schema with foreign key integrity, making the organization progressively smarter with every resolved issue.
-
-> **Core Philosophy:** *"Fix an incident once, and your entire organization never spends time diagnosing it again."*
+**IRIS solves this by placing the Relational Knowledge Store at the center:**
+1. Incidents are logged into a structured relational schema with operator audit tracking (`reported_by`).
+2. The backend performs real-time relational queries and full-text search (SQLite FTS5 with BM25 ranking) across historical problem-solution pairs.
+3. The **Google Gemini LLM** (via the official `google-genai` SDK) analyzes the current incident within the context of retrieved database precedents.
+4. **Historical Grounding:** When past matches exist, the LLM cites verified organizational solutions (e.g. `[Incident #ID]`) and adapts them.
+5. **Novel Incident Reasoning:** If no prior matches exist in the database, the LLM synthesizes a first-principles diagnosis and marks it as novel.
+6. **Honest Engineering (Zero Fake AI):** If `GEMINI_API_KEY` is not configured or the provider is unavailable, IRIS does not fake AI answers. It displays the retrieved SQL records and provides a first-class manual resolution pathway.
+7. **Closed-Loop Learning:** Once a solution is accepted or authored by an engineer, it is immediately ingested via SQL (`INSERT INTO solutions` + `UPDATE problems SET status = 'RESOLVED'`), instantly expanding organizational knowledge for all future incidents.
 
 ---
 
-## 🌟 Why is IRIS Necessary?
-
-- ⏱️ **Drastically Reduces MTTR (Mean Time to Resolution):** Cuts down diagnosis time from hours of guesswork to sub-second SQL lookups and targeted action steps.
-- 🧠 **Compounds Institutional Memory:** Every resolved problem immediately expands the database knowledge base for all future queries.
-- 🛡️ **Empowers On-Call & Junior Engineers:** Provides step-by-step actionable playbooks backed by historical organizational precedents.
-- 🔍 **Real-Time SQL Auditability:** Features real-time query logging (`sql_query_logs`) capturing query text, latency, execution timestamps, and rows affected.
-- 🔒 **Relational Data Integrity:** Enforces foreign key relationships, cascade constraints, indexed searches, and normalized schemas.
-
----
-
-## 🛠️ Tech Stack
-
-| Layer | Technology | Role |
-|---|---|---|
-| **Backend Framework** | **Python 3** / **FastAPI** | High-performance asynchronous REST API backend. |
-| **ASGI Server** | **Uvicorn** | Lightweight, lightning-fast ASGI server. |
-| **Data Validation** | **Pydantic v2** | Strict schema validation and typed data models. |
-| **Database Engine** | **SQLite 3** | Embedded relational database with foreign key support (`PRAGMA foreign_keys = ON;`) and indexing. |
-| **Frontend UI** | **Vanilla JavaScript (ES6+)** / **HTML5** | Interactive Single-Page Application (SPA) without heavy build toolchains. |
-| **Styling & Icons** | **Tailwind CSS** (CDN) / **FontAwesome** | Dark-mode UI with live query boxes, preset selectors, and table explorers. |
-
----
-
-## 🧠 How It Works: The Closed-Loop Flow
+## 🏗️ Architecture & Tech Stack
 
 ```
- [User / Engineer]
-        │
-        ▼
- 1. Log Incident (Title, Description, Category, Severity, Keywords)
-        │
-        ├─────────────────────────────────────────┐
-        ▼                                         ▼
- 2. INSERT into `problems` (Status: 'OPEN')   Audit log to `sql_query_logs`
-        │
-        ▼
- 3. Relational Knowledge Retrieval (SQL JOIN on `problems` & `solutions`)
-        │
-        ▼
- 4. AI Engine Diagnostic Synthesis
-    ├─ Match against historical precedents
-    ├─ Identify Root Cause & Action Steps
-    └─ Compute Confidence Score %
-        │
-        ▼
- 5. Closed-Loop Ingestion
-    ├─ INSERT new record into `solutions` (FK -> problems.id)
-    └─ UPDATE `problems` (SET status = 'RESOLVED', resolved_at = NOW)
-        │
-        ▼
- 6. Knowledge Base Expanded (Immediately queryable by future incidents)
++-----------------------------------------------------------------------------------+
+|                                  WEB FRONTEND                                     |
+|  Tailwind CSS • Real-Time SQL Query Log Viewer • Operator Switcher • Manual/AI UI |
++-----------------------------------------------------------------------------------+
+                                        │  REST API (JSON)
+                                        ▼
++-----------------------------------------------------------------------------------+
+|                                FASTAPI BACKEND                                    |
+|   • /api/problems (CRUD & Filters)           • /api/problems/{id}/analyze (AI)   |
+|   • /api/problems/{id}/resolve (Ingestion)   • /api/auto-classify (Real-Time)    |
+|   • /api/users (Operator Identity)           • /api/explorer/query (SQL Console) |
++-----------------------------------------------------------------------------------+
+                  │                                                 │
+                  │ SQL & FTS5 BM25 Queries                         │ Prompt & Precedents Context
+                  ▼                                                 ▼
++--------------------------------------+   +----------------------------------------+
+|      RELATIONAL KNOWLEDGE STORE      |   |            AI RESOLUTION ENGINE        |
+|  SQLite 3 + FTS5 Full-Text Indexing  |   |  Google Gemini (Official google-genai) |
+|  • problems (with reported_by audit) |   |  • Model: gemini-2.5-flash             |
+|  • solutions (with resolved_by audit)|   |  • Structured JSON schema output       |
+|  • users (operator directory)        |   |  • Citations of past database records  |
+|  • sql_query_logs (query audit trail)|   |  • First-principles novel reasoning    |
++--------------------------------------+   +----------------------------------------+
 ```
 
----
-
-## 🗄️ Relational Database Schema
+### Relational Schema
 
 ```text
-+------------------------------------+          +--------------------------------------+
-|             PROBLEMS               | 1      N |              SOLUTIONS               |
-+------------------------------------+----------+--------------------------------------+
-| id (PK, INTEGER AUTOINCREMENT)     |          | id (PK, INTEGER AUTOINCREMENT)       |
-| title (VARCHAR NOT NULL)           |          | problem_id (FK -> problems.id)       |
-| description (TEXT NOT NULL)        |          | solution_text (TEXT NOT NULL)        |
-| category (VARCHAR NOT NULL, INDEX) |          | source (VARCHAR DEFAULT 'AI')        |
-| severity (VARCHAR NOT NULL)        |          | confidence_score (REAL)              |
-| keywords (VARCHAR)                 |          | root_cause (TEXT)                    |
-| status (VARCHAR, INDEX)            |          | action_steps (TEXT)                  |
-| created_at (TIMESTAMP)             |          | created_at (TIMESTAMP)               |
-| resolved_at (TIMESTAMP)            |          +--------------------------------------+
-+------------------------------------+
-                  |
-                  v
-+------------------------------------+
-|          SQL_QUERY_LOGS            |
-+------------------------------------+
-| id (PK, INTEGER AUTOINCREMENT)     |
-| query_type (VARCHAR NOT NULL)      |
-| query_text (TEXT NOT NULL)         |
-| params (TEXT)                      |
-| rows_affected (INTEGER)            |
-| execution_time_ms (REAL)           |
-| timestamp (TIMESTAMP)              |
-+------------------------------------+
++-----------------------+          +--------------------------------------+
+|       PROBLEMS        | 1      N |              SOLUTIONS               |
++-----------------------+----------+--------------------------------------+
+| id (PK, AUTOINCREMENT)|          | id (PK, AUTOINCREMENT)               |
+| title VARCHAR(255)    |          | problem_id (FK -> problems.id)       |
+| description TEXT      |          | solution_text TEXT                   |
+| category VARCHAR(100) |          | source ('AI (Gemini)' | 'Human')     |
+| severity VARCHAR(50)  |          | resolved_by VARCHAR(100)             |
+| keywords VARCHAR(255) |          | confidence_score REAL                |
+| reported_by VARCHAR   |          | root_cause TEXT                      |
+| status ('OPEN'|'RES') |          | action_steps TEXT                    |
+| created_at TIMESTAMP  |          | created_at TIMESTAMP                 |
+| resolved_at TIMESTAMP |          +--------------------------------------+
++-----------------------+
+           │
+           │ FTS5 Virtual Table & Triggers
+           ▼
++--------------------------------------+
+|             PROBLEMS_FTS             |
++--------------------------------------+
+| title, description, keywords         |
+| (Content synced via SQLite Triggers) |
+| (BM25 ranking for fast retrieval)    |
++--------------------------------------+
 ```
 
 ---
 
-## 🚀 How to Run the Project
+## ⚡ Quick Start
 
-### 1. Prerequisites
-Ensure you have **Python 3.8+** installed on your system.
+### Prerequisites
+- Python 3.10+ (tested on Python 3.13)
+- Modern web browser
 
-### 2. Install Dependencies
-In your terminal, navigate to the project directory and install the required packages:
-```powershell
+### 1. Install Dependencies
+```bash
 pip install -r requirements.txt
 ```
 
-### 3. Launch the Server
+### 2. Configure Gemini API Key (Optional but Recommended)
+Set the environment variable or create a `.env` file in the root directory:
+```bash
+# In PowerShell:
+$env:GEMINI_API_KEY="your-gemini-api-key"
 
-Choose any of the following methods to start the application:
-
-#### Method A: PowerShell Script
-```powershell
-.\run.ps1
+# Or in Linux/macOS:
+export GEMINI_API_KEY="your-gemini-api-key"
 ```
+*(You can also configure the key at runtime via the gear icon in the dashboard header.)*
 
-#### Method B: Batch File (Windows)
-Double-click `run.bat` or execute:
-```cmd
+### 3. Launch the Server
+```bash
+# Using Python directly:
+python backend/main.py
+
+# Or on Windows using batch script:
 run.bat
 ```
 
-#### Method C: Direct Python
-```powershell
-cd backend
-python main.py
+Open your browser at: **[http://localhost:8000](http://localhost:8000)**
+
+---
+
+## 🧪 Running the Test Suite
+
+The repository includes a comprehensive 15-test verification suite covering database seeding, FTS5 BM25 retrieval, Gemini context grounding, novel incident handling, provider error resilience, and manual resolution flows.
+
+Run all tests:
+```bash
+python -m unittest discover backend -v
 ```
 
-### 4. Open in Browser
-Once the server starts, open your browser and go to:
-👉 **[http://localhost:8000](http://localhost:8000)**
+Or run individual test modules:
+```bash
+# Core database and end-to-end integration tests:
+python backend/test_iris.py
+
+# AI engine, LLM mocking, and failure mode tests:
+python backend/test_ai_engine.py
+```
 
 ---
 
-## 🎯 1-Minute Live Demo Walkthrough
+## 🛡️ Key Implementation Details
 
-### Step 1: Open the App & Explain the Vision
-- **Explain:** *"Traditional systems like Jira only store text tickets passively, while ChatGPT lacks internal organizational history. IRIS is an Organizational Incident Database where the relational database is the centerpiece."*
+1. **Genuinely AI-Driven:**
+   - Powered by Google Gemini using the official `google-genai` SDK (`gemini-2.5-flash`).
+   - Zero hardcoded solution dictionaries or static response templates.
+   - Confidence scores are evaluated dynamically by the model based on evidence strength, not fabricated arithmetic constants.
 
-### Step 2: Log a New Incident
-- Click one of the Demo Presets (e.g., **"Postgres Connection Timeout"** or type a custom problem).
-- Click **"Log to Database & Analyze with IRIS"**.
-- Highlight the real-time **SQL Query Box**:
-  ```sql
-  SELECT p.id, p.title, s.solution_text, s.confidence_score
-  FROM problems p
-  JOIN solutions s ON p.id = s.problem_id
-  WHERE ...
-  ```
-- **Explain:** *"Notice that before AI generates anything, the database performs a relational JOIN on our historical organizational records to extract validated past solutions."*
+2. **Database-Augmented Generation (DAG):**
+   - Retrieves historical precedents using SQLite FTS5 with BM25 ranking joined with the relational `solutions` table.
+   - Passes structured historical precedent objects (`incident_id`, `historical_root_cause`, `historical_solution`) into Gemini's context.
 
-### Step 3: Review AI Root-Cause Synthesis
-- Point out the **Root Cause Diagnosis**, **Recommended Primary Solution**, **Actionable Steps Checklist**, and **Confidence Score**.
+3. **Honest Failure Handling:**
+   - If an API key is missing or invalid, the system reports `ai_available: false` with the exact reason.
+   - Historical database records are still retrieved and displayed.
+   - An intuitive manual resolution editor allows engineers to resolve incidents directly without disruption.
 
-### Step 4: Closed-Loop Decision & Database Update
-- Click **"Accept AI Recommendation & Ingest into SQL"** (or enter a custom fix).
-- Switch to the **Database Explorer** tab to verify:
-  1. The new record inserted into the `solutions` table with foreign key `problem_id`.
-  2. The `problems` table record updated to `status = 'RESOLVED'`.
-  3. The `sql_query_logs` table tracking every query execution with millisecond timing.
-
----
-
-## 👥 Contributors & Academic Context
-Developed for **DBMS Review 1 Evaluation** &bull; Department of Computer Science & Engineering, **VIT Vellore**.
+4. **Operator Ownership & Auditing:**
+   - Every incident records `reported_by` (e.g. Lead SRE, Backend Engineer).
+   - Every resolution records `resolved_by` and `source` (`AI (Gemini)` or `Human`).
+   - Every database query is tracked in `sql_query_logs` with execution time and parameters.
